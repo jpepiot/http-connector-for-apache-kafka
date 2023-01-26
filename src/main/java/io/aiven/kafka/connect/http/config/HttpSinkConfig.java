@@ -38,6 +38,9 @@ public class HttpSinkConfig extends AbstractConfig {
     private static final String CONNECTION_GROUP = "Connection";
     private static final String HTTP_URL_CONFIG = "http.url";
 
+    private static final String USE_KAFKA_REST_PROXY_CONFIG = "use.kafka.rest.proxy";
+    private static final String DISABLE_SSL_CERTIFICATE_VALIDATION = "disable.ssl.certificate.validation";
+
     private static final String HTTP_AUTHORIZATION_TYPE_CONFIG = "http.authorization.type";
     private static final String HTTP_HEADERS_AUTHORIZATION_CONFIG = "http.headers.authorization";
     private static final String HTTP_HEADERS_CONTENT_TYPE_CONFIG = "http.headers.content.type";
@@ -314,6 +317,30 @@ public class HttpSinkConfig extends AbstractConfig {
                 List.of(OAUTH2_ACCESS_TOKEN_URL_CONFIG, OAUTH2_CLIENT_ID_CONFIG, OAUTH2_CLIENT_SECRET_CONFIG,
                         OAUTH2_CLIENT_AUTHORIZATION_MODE_CONFIG, OAUTH2_CLIENT_SCOPE_CONFIG)
         );
+
+        configDef.define(
+            USE_KAFKA_REST_PROXY_CONFIG,
+            ConfigDef.Type.BOOLEAN,
+            false,
+            ConfigDef.Importance.MEDIUM,
+            "Use Confluent Kafka Rest proxy service",
+            CONNECTION_GROUP,
+            groupCounter++,
+            ConfigDef.Width.SHORT,
+            USE_KAFKA_REST_PROXY_CONFIG
+        );
+
+        configDef.define(
+            DISABLE_SSL_CERTIFICATE_VALIDATION,
+            ConfigDef.Type.BOOLEAN,
+            false,
+            ConfigDef.Importance.MEDIUM,
+            "Disable the SSL certificate validation",
+            CONNECTION_GROUP,
+            groupCounter++,
+            ConfigDef.Width.SHORT,
+            DISABLE_SSL_CERTIFICATE_VALIDATION
+        );
     }
 
     private static void addBatchingConfigGroup(final ConfigDef configDef) {
@@ -571,12 +598,20 @@ public class HttpSinkConfig extends AbstractConfig {
         return getString(HTTP_HEADERS_CONTENT_TYPE_CONFIG);
     }
 
+    public final boolean useKafkaRestProxy() {
+        return getBoolean(USE_KAFKA_REST_PROXY_CONFIG);
+    }
+
     public final boolean batchingEnabled() {
         return getBoolean(BATCHING_ENABLED_CONFIG);
     }
 
     public final int batchMaxSize() {
         return getInt(BATCH_MAX_SIZE_CONFIG);
+    }
+
+    public final boolean disableSslCertificateValidation() {
+        return getBoolean(DISABLE_SSL_CERTIFICATE_VALIDATION);
     }
 
     // currently just getting this for a configuration check

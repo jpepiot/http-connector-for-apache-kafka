@@ -39,16 +39,21 @@ public abstract class RecordSender {
     public abstract void send(final SinkRecord record);
 
     public static RecordSender createRecordSender(final HttpSender httpSender, final HttpSinkConfig config) {
-        if (config.batchingEnabled()) {
-            return new BatchRecordSender(
+        if (config.useKafkaRestProxy()) {
+            return new RestProxyRecordSender(
                     httpSender,
-                    config.batchMaxSize(),
-                    config.batchPrefix(),
-                    config.batchSuffix(),
-                    config.batchSeparator());
+                    config.batchMaxSize());
         } else {
-            return new SingleRecordSender(httpSender);
+            if (config.batchingEnabled()) {
+                return new BatchRecordSender(
+                        httpSender,
+                        config.batchMaxSize(),
+                        config.batchPrefix(),
+                        config.batchSuffix(),
+                        config.batchSeparator());
+            } else {
+                return new SingleRecordSender(httpSender);
+            }
         }
     }
-
 }

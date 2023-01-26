@@ -16,10 +16,17 @@
 
 package io.aiven.kafka.connect.http.sender;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.connect.errors.ConnectException;
@@ -40,48 +47,53 @@ public class HttpSender {
     private final HttpRequestBuilder httpRequestBuilder;
 
     protected HttpSender(final HttpSinkConfig config) {
-        this(config, HttpRequestBuilder.DEFAULT_HTTP_REQUEST_BUILDER, HttpClient.newHttpClient());
+        this(config, HttpRequestBuilder.DEFAULT_HTTP_REQUEST_BUILDER,
+                config.disableSslCertificateValidation()
+                        ? HttpClient.newBuilder().sslContext(insecureContext()).build()
+                        : HttpClient.newBuilder().build());
     }
 
     protected HttpSender(final HttpSinkConfig config,
-                         final HttpRequestBuilder httpRequestBuilder) {
-        this(config, httpRequestBuilder, HttpClient.newHttpClient());
+            final HttpRequestBuilder httpRequestBuilder) {
+        this(config, httpRequestBuilder,
+                config.disableSslCertificateValidation()
+                        ? HttpClient.newBuilder().sslContext(insecureContext()).build()
+                        : HttpClient.newBuilder().build());
     }
 
     protected HttpSender(final HttpSinkConfig config,
-                         final HttpClient httpClient) {
+            final HttpClient httpClient) {
         this(config, HttpRequestBuilder.DEFAULT_HTTP_REQUEST_BUILDER, httpClient);
     }
 
     protected HttpSender(final HttpSinkConfig config,
-                         final HttpRequestBuilder httpRequestBuilder,
-                         final HttpClient httpClient) {
+            final HttpRequestBuilder httpRequestBuilder,
+            final HttpClient httpClient) {
         this.config = config;
         this.httpRequestBuilder = httpRequestBuilder;
         this.httpClient = httpClient;
     }
 
     public final void send(final String body) {
-        final var requestBuilder =
-                httpRequestBuilder
-                        .build(config)
-                        .POST(HttpRequest.BodyPublishers.ofString(body));
+        final var requestBuilder = httpRequestBuilder
+                .build(config)
+                .POST(HttpRequest.BodyPublishers.ofString(body));
         sendWithRetries(requestBuilder, HttpResponseHandler.ON_HTTP_ERROR_RESPONSE_HANDLER);
     }
 
     /**
-     * Sends a HTTP body using {@code httpSender}, respecting the configured retry policy.
+     * Sends a HTTP body using {@code httpSender}, respecting the configured retry
+     * policy.
      *
      * @return whether the sending was successful.
      */
     protected HttpResponse<String> sendWithRetries(final HttpRequest.Builder requestBuilder,
-                                                   final HttpResponseHandler httpResponseHandler) {
+            final HttpResponseHandler httpResponseHandler) {
         int remainRetries = config.maxRetries();
         while (remainRetries >= 0) {
             try {
                 try {
-                    final var response =
-                            httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+                    final var response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
                     log.debug("Server replied with status code {} and body {}", response.statusCode(), response.body());
                     httpResponseHandler.onResponse(response);
                     return response;
@@ -113,4 +125,26 @@ public class HttpSender {
         }
     }
 
+    static SSLContext insecureContext() {
+        final TrustManager[] noopTrustManager = new TrustManager[] {
+            new X509TrustManager() {
+                public void checkClientTrusted(final X509Certificate[] xcs, final String string) {
+                }
+
+                public void checkServerTrusted(final X509Certificate[] xcs, final String string) {
+                }
+
+                public X509Certificate[] getAcceptedIssuers() {
+                    return null;
+                }
+            }
+        };
+        try {
+            final SSLContext sc = SSLContext.getInstance("ssl");
+            sc.init(null, noopTrustManager, null);
+            return sc;
+        } catch (KeyManagementException | NoSuchAlgorithmException ex) {
+            return null;
+        }
+    }
 }
